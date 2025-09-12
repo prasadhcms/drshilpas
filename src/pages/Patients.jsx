@@ -251,8 +251,8 @@ export default function Patients() {
               <th className="text-left px-4 py-2">Name</th>
               <th className="text-left px-4 py-2">Email</th>
               <th className="text-left px-4 py-2">Mobile</th>
-              <th className="text-left px-4 py-2">Last appt</th>
-              <th className="text-left px-4 py-2">Total</th>
+              <th className="text-left px-4 py-2">Last Appt</th>
+              <th className="text-left px-4 py-2">Total Appt</th>
               <th className="text-left px-4 py-2">Status</th>
               <th className="px-4 py-2 text-right">Actions</th>
             </tr>
