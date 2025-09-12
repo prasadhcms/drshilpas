@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Appointments from './pages/Appointments'
+import Patients from './pages/Patients'
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/appointments" element={<Appointments />} />
+            <Route path="/patients" element={<Patients />} />
             <Route path="/" element={<Navigate to="/appointments" replace />} />
           </Route>
         </Route>

@@ -25,7 +25,12 @@ export default function Layout() {
             </span>
             <span className="text-lg sm:text-xl font-semibold">Dr. Shilpa's Clinic</span>
           </Link>
-         
+
+          <nav className="hidden md:flex items-center gap-4 ml-6 text-sm">
+            <NavLink to="/appointments" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Appointments</NavLink>
+            <NavLink to="/patients" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Patients</NavLink>
+          </nav>
+
           <div className="ml-auto flex items-center gap-6">
             <div className="flex items-center gap-3 text-sm text-white/80">
               <span className="hidden sm:block">{user?.email}</span>

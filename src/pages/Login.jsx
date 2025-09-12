@@ -20,6 +20,9 @@ export default function Login() {
       const { error } = await signInWithPassword(email, password)
       if (error) throw error
 
+      // Ensure session is fully established before navigating (prevents flicker)
+      await supabase.auth.getSession()
+
       // Enforce web access only for admin/staff/doctor/dentist/receptionist
       const { data: userData } = await supabase.auth.getUser()
       const userId = userData?.user?.id
