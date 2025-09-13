@@ -88,6 +88,33 @@ export default function Appointments() {
     return p
   }
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  // Helpers to derive Type from notes and present clean values
+  function titleCase(s){
+    return s.split(' ').map(w=> w? (w[0].toUpperCase()+w.slice(1).toLowerCase()) : w).join(' ')
+  }
+  function parseTypeFromNotes(notes){
+    if(!notes) return { type:null, cleaned: '' }
+    const s = String(notes)
+    const re = /(type)\s*[:\-]?\s*([A-Za-z0-9_\- ]+)/i
+    const m = s.match(re)
+    if(!m) return { type:null, cleaned: s.trim() }
+    const raw = (m[2]||'').trim()
+    const type = raw.replaceAll('_',' ').replace(/\s+/g,' ').trim()
+    const cleaned = s.replace(m[0], '').replace(/^\s*[\-,:]\s*/,'').trim()
+    return { type, cleaned }
+  }
+  function displayType(a){
+    const { type } = parseTypeFromNotes(a?.notes)
+    const base = type || a?.appointment_type || ''
+    return titleCase(String(base).replaceAll('_',' ').replace(/\s+/g,' ').trim())
+  }
+  function cleanedNotes(a){
+    const { cleaned, type } = parseTypeFromNotes(a?.notes)
+    // If notes only had Type and nothing else, show empty
+    const txt = (type && (!cleaned || cleaned === type)) ? '' : cleaned
+    return txt
+  }
+
   function isValidEmail(s) { return emailRe.test(s) }
   async function copyTempPassword() {
     try { if (tempPassword) await navigator.clipboard?.writeText(tempPassword) } catch {}
@@ -373,9 +400,9 @@ export default function Appointments() {
       a.appointment_time,
       nameForId(a.patient_id, a.patient_name),
       nameForId(a.dentist_id, a.dentist_name),
-      a.appointment_type,
+      displayType(a),
       a.status,
-      a.notes,
+      cleanedNotes(a),
     ])
     const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -559,9 +586,9 @@ export default function Appointments() {
                       <td className="px-3 py-2 whitespace-nowrap">{a.appointment_time}</td>
                       <td className="px-3 py-2">{nameForId(a.patient_id, a.patient_name)}</td>
                       <td className="px-3 py-2">{nameForId(a.dentist_id, a.dentist_name)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{a.appointment_type}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{displayType(a)}</td>
                       <td className="px-3 py-2 whitespace-nowrap"><StatusPill status={a.status} /></td>
-                      <td className="px-3 py-2 max-w-[320px] truncate" title={a.notes || ''}>{a.notes}</td>
+                      <td className="px-3 py-2 max-w-[320px] truncate" title={cleanedNotes(a) || ''}>{cleanedNotes(a) || '-'}</td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={()=>openEdit(a)} className="text-blue-600 hover:underline text-xs">Edit</button>
                       </td>
@@ -598,7 +625,7 @@ export default function Appointments() {
                   <div className="text-xs text-gray-500 w-16">{a.appointment_time}</div>
                   <div className="flex-1">
                     <div className="font-medium">{nameForId(a.patient_id, a.patient_name)} <span className="text-gray-500">• {nameForId(a.dentist_id, a.dentist_name)}</span></div>
-                    <div className="text-xs text-gray-600">{a.appointment_type}</div>
+                    <div className="text-xs text-gray-600">{displayType(a)}</div>
                     <div className="mt-1"><StatusPill status={a.status} /></div>
                   </div>
                   <button onClick={()=>openEdit(a)} className="text-blue-600 hover:underline text-xs">Edit</button>
