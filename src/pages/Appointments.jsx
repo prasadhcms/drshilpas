@@ -327,7 +327,22 @@ export default function Appointments() {
       const payload = { ...base, sendInvite, defaultPassword }
 
       const { data, error } = await supabase.functions.invoke('create-patient', { body: payload })
-      if (error) throw error
+      if (error) {
+        let msg = error.message || 'Failed to create patient'
+        const ctx = error.context
+        try {
+          if (ctx) {
+            if (typeof ctx === 'string') msg = ctx
+            else if (typeof ctx.body === 'string') {
+              const j = JSON.parse(ctx.body)
+              if (j?.error) msg = j.error
+            } else if (typeof ctx.error === 'string') {
+              msg = ctx.error
+            }
+          }
+        } catch {}
+        throw new Error(msg)
+      }
       const created = data
       // Update name cache and select the patient in the form
       setUserNameMap((m) => ({ ...m, [created.id]: { name: created.name, email: created.email } }))
