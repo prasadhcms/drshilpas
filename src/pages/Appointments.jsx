@@ -93,15 +93,7 @@ export default function Appointments() {
   const [createPatientError, setCreatePatientError] = useState('')
   const [newPatient, setNewPatient] = useState({ name: '', email: '', phone: '', age: '', address: '' })
   const [createPatientNotice, setCreatePatientNotice] = useState('')
-  const [useDefaultPassword, setUseDefaultPassword] = useState(false)
-  const [tempPassword, setTempPassword] = useState('')
 
-  function generateTempPassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*'
-    let p = ''
-    for (let i = 0; i < 12; i++) p += chars[Math.floor(Math.random() * chars.length)]
-    return p
-  }
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   // Helpers to derive Type from notes and present clean values
   function titleCase(s){
@@ -131,9 +123,7 @@ export default function Appointments() {
   }
 
   function isValidEmail(s) { return emailRe.test(s) }
-  async function copyTempPassword() {
-    try { if (tempPassword) await navigator.clipboard?.writeText(tempPassword) } catch {}
-  }
+
 
 
 
@@ -331,17 +321,9 @@ export default function Appointments() {
         return
       }
 
-      // Decide invite vs default password
-      const sendInvite = !useDefaultPassword
-      let defaultPassword
-      if (useDefaultPassword) {
-        defaultPassword = (tempPassword || '').trim()
-        if (!defaultPassword) {
-          const gen = generateTempPassword()
-          setTempPassword(gen)
-          defaultPassword = gen
-        }
-      }
+      // Use clinic standard password and skip invite for simplicity
+      const sendInvite = false
+      const defaultPassword = 'DSClinic@123'
       const payload = { ...base, sendInvite, defaultPassword }
 
       const { data, error } = await supabase.functions.invoke('create-patient', { body: payload })
@@ -352,13 +334,7 @@ export default function Appointments() {
       setForm((f) => ({ ...f, patient_id: created.id, patient_name: created.name || created.email || created.id }))
       setShowNewPatient(false)
       setNewPatient({ name: '', email: '', phone: '', age: '', address: '' })
-      if (created?.tempPassword) {
-        setCreatePatientNotice(`Patient created. Temporary password: ${created.tempPassword}`)
-      } else if (created?.email) {
-        setCreatePatientNotice('Patient created. Invite email sent.')
-      } else {
-        setCreatePatientNotice('Patient created.')
-      }
+      setCreatePatientNotice('Patient created. Standard password: DSClinic@123')
     } catch (e) {
       setCreatePatientError(e.message || 'Failed to create patient')
     } finally {
@@ -779,17 +755,11 @@ export default function Appointments() {
                     <div className="mt-2 text-sm text-green-800 bg-green-50 border border-green-200 rounded p-2">{createPatientNotice}</div>
                   )}
                   <div className="mt-2">
-                    <label className="inline-flex items-center gap-2">
-                      <input type="checkbox" checked={useDefaultPassword} onChange={(e)=>setUseDefaultPassword(e.target.checked)} />
-                      <span className="text-sm">Set temporary password (skip invite)</span>
-                    </label>
-                    {useDefaultPassword && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <input type="text" value={tempPassword} onChange={(e)=>setTempPassword(e.target.value)} placeholder="Temporary password" className="w-full border rounded px-2 py-1 text-sm" />
-                        <button type="button" onClick={()=>setTempPassword(generateTempPassword())} className="px-2 py-1 border rounded">Generate</button>
-                        <button type="button" onClick={copyTempPassword} className="px-2 py-1 border rounded">Copy</button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 text-sm">
+                      <span>Standard password:</span>
+                      <code className="px-2 py-0.5 bg-gray-100 rounded">DSClinic@123</code>
+                      <button type="button" onClick={()=>navigator.clipboard?.writeText('DSClinic@123')} className="px-2 py-1 border rounded">Copy</button>
+                    </div>
                     <p className="mt-1 text-xs text-gray-500">If a matching email or phone already exists, we will select that patient instead of creating a duplicate.</p>
                   </div>
 
