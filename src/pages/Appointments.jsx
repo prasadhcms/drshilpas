@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+
+// Appointment types (mirrors mobile app)
+const APPOINTMENT_TYPES = [
+  { value: 'checkup', label: 'Regular Checkup' },
+  { value: 'cleaning', label: 'Teeth Cleaning' },
+  { value: 'filling', label: 'Filling' },
+  { value: 'extraction', label: 'Tooth Extraction' },
+  { value: 'root_canal', label: 'Root Canal' },
+  { value: 'crown', label: 'Crown' },
+  { value: 'orthodontics', label: 'Orthodontics' },
+  { value: 'consultation', label: 'Consultation' },
+  { value: 'emergency', label: 'Emergency' },
+  { value: 'followup', label: 'Follow-up' },
+]
+
 function StatusPill({ status }) {
   const { bg, text } = useMemo(() => {
     const map = {
@@ -133,7 +148,7 @@ export default function Appointments() {
     patient_id: '',
     patient_name: '',
     dentist_id: '',
-    appointment_type: '',
+    appointment_type: 'checkup',
     status: 'scheduled',
     notes: '',
   }
@@ -238,6 +253,7 @@ export default function Appointments() {
     setShowModal(true)
   }
   function openEdit(a) {
+    const parsed = parseTypeFromNotes(a?.notes)
     setForm({
       id: a.id,
       appointment_date: a.appointment_date || '',
@@ -245,9 +261,9 @@ export default function Appointments() {
       patient_id: a.patient_id || '',
       patient_name: a.patient_name || '',
       dentist_id: a.dentist_id || '',
-      appointment_type: a.appointment_type || '',
+      appointment_type: (parsed.type || a.appointment_type || ''),
       status: a.status || 'scheduled',
-      notes: a.notes || '',
+      notes: (parsed.type ? parsed.cleaned : (a.notes || '')),
     })
     setShowModal(true)
   }
@@ -421,9 +437,12 @@ export default function Appointments() {
     setSaving(true)
     setError('')
     try {
-      // Server-side double check for conflicts
+      // Validate required fields (we avoid relying on browser 'required' for patient)
       if (!form.appointment_date || !form.appointment_time || !form.dentist_id) {
         throw new Error('Please select date, time, and dentist')
+      }
+      if (!form.patient_id) {
+        throw new Error('Please select a patient or use "Create & Select"')
       }
       let dupQuery = supabase
         .from('appointments')
@@ -441,6 +460,12 @@ export default function Appointments() {
       }
 
       const payload = { ...form }
+      // If user pasted a "Type: ..." into notes, extract it and clean notes
+      if (payload.notes) {
+        const p = parseTypeFromNotes(payload.notes)
+        if (p.type && !payload.appointment_type) payload.appointment_type = p.type
+        payload.notes = p.cleaned
+      }
       if (isEditing) {
         const { error } = await supabase.from('appointments').update(payload).eq('id', form.id)
         if (error) throw error
@@ -568,7 +593,7 @@ export default function Appointments() {
                   <th className="text-left font-semibold px-3 py-2">Time</th>
                   <th className="text-left font-semibold px-3 py-2">Patient</th>
                   <th className="text-left font-semibold px-3 py-2">Dentist</th>
-                  <th className="text-left font-semibold px-3 py-2">Type</th>
+                  <th className="text-left font-semibold px-3 py-2">Appt for</th>
                   <th className="text-left font-semibold px-3 py-2">Status</th>
                   <th className="text-left font-semibold px-3 py-2">Notes</th>
                   <th className="px-3 py-2" />
@@ -688,7 +713,6 @@ export default function Appointments() {
               <div className="col-span-2 relative">
                 <label className="block text-xs text-gray-600 mb-1">Patient</label>
                 <input
-                  required
                   value={form.patient_name}
                   onChange={(e)=>{ setForm(f=>({...f, patient_name: e.target.value })); setShowPatientDropdown(true) }}
                   onFocus={()=>setShowPatientDropdown(true)}
@@ -790,7 +814,11 @@ export default function Appointments() {
               </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Type</label>
-                <input value={form.appointment_type} onChange={(e)=>setForm(f=>({...f, appointment_type: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
+                <select value={form.appointment_type} onChange={(e)=>setForm(f=>({...f, appointment_type: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm">
+                  {APPOINTMENT_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Status</label>
