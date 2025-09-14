@@ -146,6 +146,8 @@ export default function Patients() {
             name: form.name,
             email: form.email,
             phone: form.phone,
+            date_of_birth: form.date_of_birth || null,
+            gender: form.gender || null,
             address: form.address,
             sendInvite: form.sendInvite,
             defaultPassword: form.defaultPassword || undefined,
