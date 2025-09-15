@@ -83,10 +83,9 @@ export default function Appointments() {
     return (u?.name || u?.email || id || '')
   }
 
-  // Conflict + patient autocomplete state
+  // Conflict state
   const [conflict, setConflict] = useState(false)
   const [conflictMsg, setConflictMsg] = useState('')
-  const [patientResults, setPatientResults] = useState([])
 
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -153,7 +152,8 @@ export default function Appointments() {
   function fmt(d) { return d.toISOString().slice(0,10) }
 
   async function loadDentists() {
-    const { data } = await supabase.from('users').select('id,name,role').eq('role', 'dentist')
+    // Load users with either 'dentist' or 'doctor' role
+    const { data } = await supabase.from('users').select('id,name,role').in('role', ['dentist', 'doctor'])
     setDentists(data || [])
   }
 
@@ -252,29 +252,7 @@ export default function Appointments() {
     })
     setShowModal(true)
   }
-  // Patient search (autocomplete)
-  async function searchPatients(term) {
-    const t = term?.trim()
-    if (!t || t.length < 2) { setPatientResults([]); setShowPatientDropdown(false); return }
-    setPatientSearching(true)
-    try {
-      // Search patients in users table by role
-      const { data, error } = await supabase
-        .from('users')
-        .select('id,name,email,phone,role')
-        .eq('role', 'patient')
-        .ilike('name', `%${t}%`)
-        .limit(10)
-      if (error) throw error
-      setPatientResults(data || [])
-      setShowPatientDropdown(true)
-    } catch (_e) {
-      setPatientResults([])
-      setShowPatientDropdown(false)
-    } finally {
-      setPatientSearching(false)
-    }
-  }
+
 
 
 
@@ -305,15 +283,12 @@ export default function Appointments() {
     }
   }
 
-  // React to modal field changes for conflict + patient search
+  // React to modal field changes for conflict detection
   useEffect(() => {
     if (!showModal) return
     checkConflictLocal(form)
-    const t = form.patient_name
-    if (!t || t.trim().length < 2) { setPatientResults([]); setShowPatientDropdown(false); return }
-    searchPatients(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showModal, form.appointment_date, form.appointment_time, form.dentist_id, form.patient_name, form.id])
+  }, [showModal, form.appointment_date, form.appointment_time, form.dentist_id, form.id])
 
 
   function exportCSV() {
@@ -377,12 +352,48 @@ export default function Appointments() {
         if (p.type && !payload.appointment_type) payload.appointment_type = p.type
         payload.notes = p.cleaned
       }
+
       if (isEditing) {
-        const { error } = await supabase.from('appointments').update(payload).eq('id', form.id)
+        // For updates, remove id from payload
+        const { id, ...updatePayload } = payload
+        const { error } = await supabase.from('appointments').update(updatePayload).eq('id', form.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('appointments').insert([payload])
-        if (error) throw error
+        // Calculate end_time by adding duration to start_time
+        const startTime = payload.appointment_time
+        const duration = 30 // 30 minutes default
+        const [hours, minutes] = startTime.split(':').map(Number)
+        const startMinutes = hours * 60 + minutes
+        const endMinutes = startMinutes + duration
+        const endHours = Math.floor(endMinutes / 60)
+        const endMins = endMinutes % 60
+        const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`
+
+        // Use ONLY the original table columns (avoid appointment_date/appointment_time)
+        const insertPayload = {
+          date: payload.appointment_date,                    // Use original 'date' column
+          start_time: startTime,                             // Use original 'start_time' column
+          end_time: endTime,                                 // Calculate proper end_time
+          patient_name: payload.patient_name,                // Our new column
+          patient_phone: payload.patient_phone || null,     // Our new column
+          patient_id: payload.patient_id || null,            // Make nullable
+          dentist_id: payload.dentist_id,
+          appointment_type: payload.appointment_type || 'checkup',
+          status: payload.status || 'scheduled',
+          notes: payload.notes || null,
+          duration_minutes: duration,                        // Set duration
+        }
+
+        console.log('Inserting appointment with payload:', insertPayload)
+        const { data, error } = await supabase.from('appointments').insert([insertPayload])
+        if (error) {
+          console.error('Insert error details:', error)
+          console.error('Error message:', error.message)
+          console.error('Error details:', error.details)
+          console.error('Error hint:', error.hint)
+          throw error
+        }
+        console.log('Insert successful:', data)
       }
       setShowModal(false)
       setForm(emptyForm)
