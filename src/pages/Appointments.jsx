@@ -87,12 +87,7 @@ export default function Appointments() {
   const [conflict, setConflict] = useState(false)
   const [conflictMsg, setConflictMsg] = useState('')
   const [patientResults, setPatientResults] = useState([])
-  // New patient creation state
-  const [showNewPatient, setShowNewPatient] = useState(false)
-  const [creatingPatient, setCreatingPatient] = useState(false)
-  const [createPatientError, setCreatePatientError] = useState('')
-  const [newPatient, setNewPatient] = useState({ name: '', email: '', phone: '', age: '', address: '' })
-  const [createPatientNotice, setCreatePatientNotice] = useState('')
+
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   // Helpers to derive Type from notes and present clean values
@@ -127,8 +122,7 @@ export default function Appointments() {
 
 
 
-  const [patientSearching, setPatientSearching] = useState(false)
-  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+
 
   // Modal state
   const emptyForm = {
@@ -137,6 +131,7 @@ export default function Appointments() {
     appointment_time: '10:00',
     patient_id: '',
     patient_name: '',
+    patient_phone: '',
     dentist_id: '',
     appointment_type: 'checkup',
     status: 'scheduled',
@@ -280,82 +275,7 @@ export default function Appointments() {
       setPatientSearching(false)
     }
   }
-  async function handleCreatePatient() {
-    setCreatingPatient(true)
-    setCreatePatientError('')
-    try {
-      const base = {
-        name: newPatient.name?.trim(),
-        email: newPatient.email?.trim() || null,
-        phone: newPatient.phone?.trim() || null,
-        age: newPatient.age?.trim() || null,
-        address: newPatient.address?.trim() || null,
-      }
-      if (!base.name) throw new Error('Name is required for new patient')
-      if (!base.email && !base.phone) throw new Error('Email or Phone is required')
-      if (base.email && !isValidEmail(base.email)) throw new Error('Please enter a valid email')
 
-      // Duplicate detection by email or phone (patient role)
-      let existing = null
-      if (base.email) {
-        const { data: ex1 } = await supabase.from('users')
-          .select('id,name,email,role')
-          .eq('email', base.email)
-          .eq('role', 'patient')
-          .limit(1)
-        if (ex1 && ex1.length) existing = ex1[0]
-      }
-      if (!existing && base.phone) {
-        const { data: ex2 } = await supabase.from('users')
-          .select('id,name,phone,role,email')
-          .eq('phone', base.phone)
-          .eq('role', 'patient')
-          .limit(1)
-        if (ex2 && ex2.length) existing = ex2[0]
-      }
-      if (existing) {
-        setUserNameMap((m) => ({ ...m, [existing.id]: { name: existing.name, email: existing.email } }))
-        setForm((f) => ({ ...f, patient_id: existing.id, patient_name: existing.name || existing.email || existing.id }))
-        setShowNewPatient(false)
-        setCreatePatientNotice('Existing patient found and selected.')
-        return
-      }
-
-      // Use clinic standard password and skip invite for simplicity
-      const sendInvite = false
-      const defaultPassword = 'DSClinic@123'
-      const payload = { ...base, sendInvite, defaultPassword }
-
-      const { data, error } = await supabase.functions.invoke('create-patient', { body: payload })
-      if (error) {
-        let msg = error.message || 'Failed to create patient'
-        const ctx = error.context
-        try {
-          if (ctx) {
-            if (typeof ctx === 'string') msg = ctx
-            else if (typeof ctx.body === 'string') {
-              const j = JSON.parse(ctx.body)
-              if (j?.error) msg = j.error
-            } else if (typeof ctx.error === 'string') {
-              msg = ctx.error
-            }
-          }
-        } catch {}
-        throw new Error(msg)
-      }
-      const created = data
-      // Update name cache and select the patient in the form
-      setUserNameMap((m) => ({ ...m, [created.id]: { name: created.name, email: created.email } }))
-      setForm((f) => ({ ...f, patient_id: created.id, patient_name: created.name || created.email || created.id }))
-      setShowNewPatient(false)
-      setNewPatient({ name: '', email: '', phone: '', age: '', address: '' })
-      setCreatePatientNotice('Patient created. Standard password: DSClinic@123')
-    } catch (e) {
-      setCreatePatientError(e.message || 'Failed to create patient')
-    } finally {
-      setCreatingPatient(false)
-    }
-  }
 
 
   // Check for dentist/time conflicts on same date
@@ -428,12 +348,12 @@ export default function Appointments() {
     setSaving(true)
     setError('')
     try {
-      // Validate required fields (we avoid relying on browser 'required' for patient)
+      // Validate required fields
       if (!form.appointment_date || !form.appointment_time || !form.dentist_id) {
         throw new Error('Please select date, time, and dentist')
       }
-      if (!form.patient_id) {
-        throw new Error('Please select a patient or use "Create & Select"')
+      if (!form.patient_name || !form.patient_name.trim()) {
+        throw new Error('Please enter patient name')
       }
       let dupQuery = supabase
         .from('appointments')
@@ -701,91 +621,27 @@ export default function Appointments() {
                 <label className="block text-xs text-gray-600 mb-1">Time</label>
                 <input type="time" required value={form.appointment_time} onChange={(e)=>setForm(f=>({...f, appointment_time: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
               </div>
-              <div className="col-span-2 relative">
-                <label className="block text-xs text-gray-600 mb-1">Patient</label>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Patient Name *</label>
                 <input
                   value={form.patient_name}
-                  onChange={(e)=>{ setForm(f=>({...f, patient_name: e.target.value })); setShowPatientDropdown(true) }}
-                  onFocus={()=>setShowPatientDropdown(true)}
+                  onChange={(e) => setForm(f => ({ ...f, patient_name: e.target.value }))}
                   className="w-full border rounded px-2 py-1 text-sm"
-                  placeholder="Type at least 2 characters to search"
+                  placeholder="Enter patient name"
+                  required
                 />
-                {showPatientDropdown && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-56 overflow-auto">
-                    {patientSearching && (
-                      <div className="px-3 py-2 text-sm text-gray-500">Searching…</div>
-                    )}
-                    {!patientSearching && patientResults.length === 0 && (
-                      <div className="px-3 py-2 text-sm text-gray-500">No matches</div>
-                    )}
-                    {!patientSearching && patientResults.map(p => (
-                      <button
-                        type="button"
-                        key={p.id}
-                        onClick={()=>{ setForm(f=>({...f, patient_id: p.id, patient_name: p.name || p.email || p.id })); setShowPatientDropdown(false) }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                      >
-                        <div className="text-sm font-medium">{p.name || p.email || p.id}</div>
-                        <div className="text-xs text-gray-500">{p.email || ''} {p.phone ? `• ${p.phone}` : ''}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
-              <div className="col-span-2">
-                <button type="button" onClick={()=>{ setShowNewPatient(s=>!s); setCreatePatientError('') }} className="mt-2 bg-[#2874ba] text-white text-sm px-3 py-1.5 rounded hover:bg-[#2163a0]">
-                  {showNewPatient ? 'Hide New Patient Form' : 'Add New Patient'}
-                </button>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Patient Phone</label>
+                <input
+                  value={form.patient_phone || ''}
+                  onChange={(e) => setForm(f => ({ ...f, patient_phone: e.target.value }))}
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  placeholder="Patient contact number"
+                />
               </div>
 
-              {showNewPatient && (
-                <div className="col-span-2 border rounded p-3 bg-gray-50">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Name</label>
-                      <input value={newPatient.name} onChange={(e)=>setNewPatient(v=>({...v, name: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" required />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Phone</label>
-                      <input value={newPatient.phone} onChange={(e)=>setNewPatient(v=>({...v, phone: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
-                    </div>
-                    <div>
 
-                      <label className="block text-xs text-gray-600 mb-1">Email</label>
-                      <input type="email" value={newPatient.email} onChange={(e)=>setNewPatient(v=>({...v, email: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Age</label>
-                      <input value={newPatient.age} onChange={(e)=>setNewPatient(v=>({...v, age: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs text-gray-600 mb-1">Address</label>
-                      <input value={newPatient.address} onChange={(e)=>setNewPatient(v=>({...v, address: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
-                    </div>
-                  </div>
-                  {createPatientError && (
-                    <div className="mt-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">{createPatientError}</div>
-                  )}
-                  {createPatientNotice && (
-                    <div className="mt-2 text-sm text-green-800 bg-green-50 border border-green-200 rounded p-2">{createPatientNotice}</div>
-                  )}
-                  <div className="mt-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span>Standard password:</span>
-                      <code className="px-2 py-0.5 bg-gray-100 rounded">DSClinic@123</code>
-                      <button type="button" onClick={()=>navigator.clipboard?.writeText('DSClinic@123')} className="px-2 py-1 border rounded">Copy</button>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">If a matching email or phone already exists, we will select that patient instead of creating a duplicate.</p>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <button type="button" disabled={creatingPatient} onClick={handleCreatePatient} className="px-3 py-1.5 bg-green-600 text-white rounded disabled:opacity-50">
-                      {creatingPatient ? 'Creating…' : 'Create & Select'}
-                    </button>
-                    <button type="button" onClick={()=>{ setShowNewPatient(false); setCreatePatientError('') }} className="px-3 py-1.5 border rounded">Cancel</button>
-                  </div>
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Dentist</label>
