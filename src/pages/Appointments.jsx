@@ -87,6 +87,11 @@ export default function Appointments() {
   const [conflict, setConflict] = useState(false)
   const [conflictMsg, setConflictMsg] = useState('')
 
+  // Patient search state
+  const [patientResults, setPatientResults] = useState([])
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+  const [patientSearching, setPatientSearching] = useState(false)
+
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   // Helpers to derive Type from notes and present clean values
@@ -135,11 +140,89 @@ export default function Appointments() {
     appointment_type: 'checkup',
     status: 'scheduled',
     notes: '',
+    charges: '500.00',
+    paid: '',
+    balance: '500.00',
   }
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const isEditing = !!form.id
+
+  // Patient search function
+  async function searchPatients(term) {
+    const t = term?.trim()
+    if (!t || t.length < 2) {
+      setPatientResults([])
+      setShowPatientDropdown(false)
+      return
+    }
+
+    setPatientSearching(true)
+    try {
+      // Search in both users table (registered patients) and appointments table (previous patient names)
+      const [usersResult, appointmentsResult] = await Promise.all([
+        // Search registered patients
+        supabase
+          .from('users')
+          .select('id, name, email, phone, role')
+          .eq('role', 'patient')
+          .or(`name.ilike.%${t}%, email.ilike.%${t}%, phone.ilike.%${t}%`)
+          .limit(5),
+
+        // Search previous appointment patient names
+        supabase
+          .from('appointments')
+          .select('patient_name, patient_phone')
+          .not('patient_name', 'is', null)
+          .ilike('patient_name', `%${t}%`)
+          .limit(5)
+      ])
+
+      const results = []
+
+      // Add registered patients
+      if (usersResult.data) {
+        usersResult.data.forEach(user => {
+          results.push({
+            type: 'registered',
+            id: user.id,
+            name: user.name,
+            phone: user.phone,
+            email: user.email,
+            display: `${user.name} (Registered)`,
+            subtitle: `${user.email || ''} ${user.phone ? `• ${user.phone}` : ''}`
+          })
+        })
+      }
+
+      // Add unique previous patient names (avoid duplicates)
+      if (appointmentsResult.data) {
+        const existingNames = new Set(results.map(r => r.name?.toLowerCase()))
+        appointmentsResult.data.forEach(appt => {
+          if (appt.patient_name && !existingNames.has(appt.patient_name.toLowerCase())) {
+            results.push({
+              type: 'previous',
+              name: appt.patient_name,
+              phone: appt.patient_phone,
+              display: appt.patient_name,
+              subtitle: appt.patient_phone ? `${appt.patient_phone} (Previous patient)` : '(Previous patient)'
+            })
+            existingNames.add(appt.patient_name.toLowerCase())
+          }
+        })
+      }
+
+      setPatientResults(results)
+      setShowPatientDropdown(true)
+    } catch (error) {
+      console.error('Patient search error:', error)
+      setPatientResults([])
+      setShowPatientDropdown(false)
+    } finally {
+      setPatientSearching(false)
+    }
+  }
 
   function startOfWeek(dateStr) {
     const d = new Date(dateStr)
@@ -245,10 +328,14 @@ export default function Appointments() {
       appointment_time: a.appointment_time || '10:00',
       patient_id: a.patient_id || '',
       patient_name: a.patient_name || '',
+      patient_phone: a.patient_phone || '',
       dentist_id: a.dentist_id || '',
       appointment_type: (parsed.type || a.appointment_type || ''),
       status: a.status || 'scheduled',
       notes: (parsed.type ? parsed.cleaned : (a.notes || '')),
+      charges: a.charges || '',
+      paid: a.paid || '',
+      balance: a.balance || '',
     })
     setShowModal(true)
   }
@@ -283,16 +370,26 @@ export default function Appointments() {
     }
   }
 
-  // React to modal field changes for conflict detection
+  // React to modal field changes for conflict detection and patient search
   useEffect(() => {
     if (!showModal) return
     checkConflictLocal(form)
+
+    // Trigger patient search when typing
+    const patientName = form.patient_name?.trim()
+    if (patientName && patientName.length >= 2) {
+      const timeoutId = setTimeout(() => searchPatients(patientName), 300) // Debounce
+      return () => clearTimeout(timeoutId)
+    } else {
+      setPatientResults([])
+      setShowPatientDropdown(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showModal, form.appointment_date, form.appointment_time, form.dentist_id, form.id])
+  }, [showModal, form.appointment_date, form.appointment_time, form.dentist_id, form.id, form.patient_name])
 
 
   function exportCSV() {
-    const headers = ['date','time','patient','dentist','type','status','notes']
+    const headers = ['date','time','patient','dentist','type','status','notes','charges','paid','balance']
     const esc = (v) => {
       const s = (v ?? '').toString()
       return '"' + s.replaceAll('"', '""') + '"'
@@ -305,6 +402,9 @@ export default function Appointments() {
       displayType(a),
       a.status,
       cleanedNotes(a),
+      a.charges || '0.00',
+      a.paid || '0.00',
+      a.balance || '0.00',
     ])
     const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -353,9 +453,27 @@ export default function Appointments() {
         payload.notes = p.cleaned
       }
 
+      // Process payment fields
+      const charges = payload.charges ? parseFloat(payload.charges) : null
+      const paid = payload.paid ? parseFloat(payload.paid) : null
+
       if (isEditing) {
-        // For updates, remove id from payload
-        const { id, ...updatePayload } = payload
+        // For updates, remove id, balance, and generated columns from payload
+        const { id, balance, appointment_date, appointment_time, ...updatePayload } = payload
+
+        // Use the correct column names for updates
+        updatePayload.date = payload.appointment_date  // Use 'date' instead of 'appointment_date'
+        updatePayload.start_time = payload.appointment_time  // Use 'start_time' instead of 'appointment_time'
+
+        // Handle UUID fields - convert empty strings to null
+        updatePayload.patient_id = updatePayload.patient_id || null
+        updatePayload.staff_id = updatePayload.staff_id || null
+
+        // Add processed payment fields
+        updatePayload.charges = charges
+        updatePayload.paid = paid
+
+        console.log('Update payload:', updatePayload) // Debug log
         const { error } = await supabase.from('appointments').update(updatePayload).eq('id', form.id)
         if (error) throw error
       } else {
@@ -382,6 +500,8 @@ export default function Appointments() {
           status: payload.status || 'scheduled',
           notes: payload.notes || null,
           duration_minutes: duration,                        // Set duration
+          charges: charges,                                  // Payment fields
+          paid: paid,
         }
 
         console.log('Inserting appointment with payload:', insertPayload)
@@ -518,14 +638,17 @@ export default function Appointments() {
                   <th className="text-left font-semibold px-3 py-2">Appt for</th>
                   <th className="text-left font-semibold px-3 py-2">Status</th>
                   <th className="text-left font-semibold px-3 py-2">Notes</th>
+                  <th className="text-left font-semibold px-3 py-2">Charges</th>
+                  <th className="text-left font-semibold px-3 py-2">Paid</th>
+                  <th className="text-left font-semibold px-3 py-2">Balance</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-500">Loading…</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-6 text-center text-gray-500">Loading…</td></tr>
                 ) : appointments.length === 0 ? (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-500">No appointments</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-6 text-center text-gray-500">No appointments</td></tr>
                 ) : (
                   appointments.map((a) => (
                     <tr key={a.id} className="border-t hover:bg-gray-50">
@@ -536,6 +659,23 @@ export default function Appointments() {
                       <td className="px-3 py-2 whitespace-nowrap">{displayType(a)}</td>
                       <td className="px-3 py-2 whitespace-nowrap"><StatusPill status={a.status} /></td>
                       <td className="px-3 py-2 max-w-[320px] truncate" title={cleanedNotes(a) || ''}>{cleanedNotes(a) || '-'}</td>
+                      <td className="px-3 py-2 text-right">{a.charges ? `₹${parseFloat(a.charges).toFixed(2)}` : '-'}</td>
+                      <td className="px-3 py-2 text-right">{a.paid ? `₹${parseFloat(a.paid).toFixed(2)}` : '-'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {a.charges && parseFloat(a.charges) > 0 ? (
+                          parseFloat(a.balance || 0) === 0 ? (
+                            <span className="font-medium text-green-600">Fully PAID</span>
+                          ) : parseFloat(a.balance || 0) > 0 ? (
+                            <span className="font-medium text-red-600">
+                              ₹{parseFloat(a.balance).toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="font-medium text-green-600">
+                              ₹{parseFloat(a.balance).toFixed(2)}
+                            </span>
+                          )
+                        ) : '-'}
+                      </td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={()=>openEdit(a)} className="text-blue-600 hover:underline text-xs">Edit</button>
                       </td>
@@ -632,16 +772,72 @@ export default function Appointments() {
                 <label className="block text-xs text-gray-600 mb-1">Time</label>
                 <input type="time" required value={form.appointment_time} onChange={(e)=>setForm(f=>({...f, appointment_time: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
               </div>
-              <div>
+              <div className="col-span-2 relative">
                 <label className="block text-xs text-gray-600 mb-1">Patient Name *</label>
                 <input
                   value={form.patient_name}
-                  onChange={(e) => setForm(f => ({ ...f, patient_name: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setForm(f => ({ ...f, patient_name: value }))
+                    // Clear patient_id when typing new name
+                    if (f => f.patient_id) {
+                      setForm(f => ({ ...f, patient_id: null }))
+                    }
+                  }}
+                  onFocus={() => {
+                    if (form.patient_name && form.patient_name.length >= 2) {
+                      setShowPatientDropdown(true)
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding dropdown to allow clicks
+                    setTimeout(() => setShowPatientDropdown(false), 200)
+                  }}
                   className="w-full border rounded px-2 py-1 text-sm"
-                  placeholder="Enter patient name"
+                  placeholder="Type patient name to search or enter new name"
                   required
                 />
+
+                {/* Patient search dropdown */}
+                {showPatientDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded shadow-lg max-h-48 overflow-y-auto">
+                    {patientSearching && (
+                      <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                    )}
+
+                    {!patientSearching && patientResults.length === 0 && form.patient_name && form.patient_name.length >= 2 && (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        No existing patients found. Continue typing to create new patient.
+                      </div>
+                    )}
+
+                    {!patientSearching && patientResults.map((patient, index) => (
+                      <button
+                        key={`${patient.type}-${patient.id || patient.name}-${index}`}
+                        type="button"
+                        onClick={() => {
+                          setForm(f => ({
+                            ...f,
+                            patient_name: patient.name,
+                            patient_phone: patient.phone || '',
+                            patient_id: patient.id || null
+                          }))
+                          setShowPatientDropdown(false)
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="text-sm font-medium text-gray-900">
+                          {patient.display}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {patient.subtitle}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Patient Phone</label>
                 <input
@@ -685,6 +881,59 @@ export default function Appointments() {
               <div className="col-span-2">
                 <label className="block text-xs text-gray-600 mb-1">Notes</label>
                 <textarea rows={3} value={form.notes} onChange={(e)=>setForm(f=>({...f, notes: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
+              </div>
+
+              {/* Payment Information Section */}
+              <div className="col-span-2">
+                <div className="border-t pt-3 mt-3">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Payment Information</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Total Charges</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.charges}
+                        onChange={(e) => {
+                          const charges = e.target.value
+                          const paid = form.paid || 0
+                          const balance = charges ? (parseFloat(charges) - parseFloat(paid)).toFixed(2) : ''
+                          setForm(f => ({ ...f, charges, balance }))
+                        }}
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Paid Amount</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.paid}
+                        onChange={(e) => {
+                          const paid = e.target.value
+                          const charges = form.charges || 0
+                          const balance = charges ? (parseFloat(charges) - parseFloat(paid)).toFixed(2) : ''
+                          setForm(f => ({ ...f, paid, balance }))
+                        }}
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Balance</label>
+                      <input
+                        type="text"
+                        value={form.balance}
+                        readOnly
+                        className="w-full border rounded px-2 py-1 text-sm bg-gray-50"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             {conflict && (

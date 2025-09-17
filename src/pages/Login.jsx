@@ -33,10 +33,10 @@ export default function Login() {
         .eq('id', userId)
         .single()
       if (profileError) throw profileError
-      const allowed = ['admin', 'staff', 'doctor', 'dentist', 'receptionist']
+      const allowed = ['admin', 'staff', 'doctor', 'receptionist']
       if (!allowed.includes((profile?.role || '').toLowerCase())) {
         await supabase.auth.signOut()
-        throw new Error('Web access is restricted to Admin, Staff, Doctor/Dentist, or Receptionist accounts')
+        throw new Error('Web access is restricted to Admin, Staff, Doctor, or Receptionist accounts')
       }
 
       navigate('/appointments', { replace: true })
