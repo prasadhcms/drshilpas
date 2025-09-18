@@ -533,6 +533,29 @@ export default function Appointments() {
       setPage(1)
     }
   }
+
+  // Day navigation functions
+  function goToPrevDay() {
+    const currentDate = new Date(calendarDate || new Date())
+    const prevDay = new Date(currentDate)
+    prevDay.setDate(currentDate.getDate() - 1)
+    const prevDateStr = fmt(prevDay)
+    setCalendarDate(prevDateStr)
+    setFromDate(prevDateStr)
+    setToDate(prevDateStr)
+    setPage(1)
+  }
+
+  function goToNextDay() {
+    const currentDate = new Date(calendarDate || new Date())
+    const nextDay = new Date(currentDate)
+    nextDay.setDate(currentDate.getDate() + 1)
+    const nextDateStr = fmt(nextDay)
+    setCalendarDate(nextDateStr)
+    setFromDate(nextDateStr)
+    setToDate(nextDateStr)
+    setPage(1)
+  }
   function switchToWeek() {
     setView('week')
     if (calendarDate) {
@@ -698,7 +721,30 @@ export default function Appointments() {
       {/* Day view */}
       {view === 'day' && (
         <section className="mt-4 bg-white rounded-lg shadow border p-3">
-          <h3 className="font-semibold mb-2">Appointments on {fromDate}</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToPrevDay}
+                className="bg-slate-600 text-white text-sm px-3 py-1.5 rounded hover:bg-slate-700"
+                title="Previous Day"
+              >
+                <span className="mr-1">←</span> Prev Day
+              </button>
+              <h3 className="font-semibold text-lg">
+                Todays Date:  {fromDate}
+              </h3>
+              <button
+                onClick={goToNextDay}
+                className="bg-slate-600 text-white text-sm px-3 py-1.5 rounded hover:bg-slate-700"
+                title="Next Day"
+              >
+                Next Day <span className="ml-1">→</span>
+              </button>
+            </div>
+            <div className="text-sm text-gray-500">
+              {appointments.length} appointment{appointments.length !== 1 ? 's' : ''}
+            </div>
+          </div>
           {loading ? (
             <div className="px-3 py-6 text-center text-gray-500">Loading…</div>
           ) : appointments.length === 0 ? (
