@@ -205,19 +205,22 @@ export default function Patients() {
       if (!ids.length) { setStats({}); return }
       const { data, error } = await supabase
         .from('appointments')
-        .select('id, patient_id, start_at, appointment_date, appointment_time, balance')
+        .select('id, patient_id, start_at, appointment_date, appointment_time, balance, charges')
         .in('patient_id', ids)
       if (error) throw error
       const map = {}
       for (const a of (data || [])) {
         const pid = a.patient_id
         if (!pid) continue
-        const entry = map[pid] || { count: 0, lastAt: null, totalBalance: 0 }
+        const entry = map[pid] || { count: 0, lastAt: null, totalBalance: 0, hasPaymentInfo: false }
         entry.count += 1
 
-        // Calculate total balance for the patient
-        const balance = parseFloat(a.balance || 0)
-        entry.totalBalance += balance
+        // Calculate total balance for the patient - only include appointments with payment information
+        if (a.charges != null) {
+          const balance = parseFloat(a.balance || 0)
+          entry.totalBalance += balance
+          entry.hasPaymentInfo = true
+        }
 
         let dt = null
         if (a.start_at) dt = new Date(a.start_at)
@@ -280,7 +283,7 @@ export default function Patients() {
                   <span className={`px-2 py-0.5 rounded text-xs ${r.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700'}`}>{r.status}</span>
                 </td>
                 <td className="px-4 py-2">
-                  {stats[r.id]?.totalBalance !== undefined ? (
+                  {stats[r.id]?.hasPaymentInfo ? (
                     stats[r.id].totalBalance === 0 ? (
                       <span className="font-medium text-green-600">Fully PAID</span>
                     ) : stats[r.id].totalBalance > 0 ? (

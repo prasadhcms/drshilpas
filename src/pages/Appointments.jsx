@@ -685,18 +685,24 @@ export default function Appointments() {
                       <td className="px-3 py-2">{a.charges ? `₹${parseFloat(a.charges).toFixed(2)}` : '-'}</td>
                       <td className="px-3 py-2">{a.paid ? `₹${parseFloat(a.paid).toFixed(2)}` : '-'}</td>
                       <td className="px-3 py-2">
-                        {a.charges && parseFloat(a.charges) > 0 ? (
-                          parseFloat(a.balance || 0) === 0 ? (
+                        {a.charges != null && parseFloat(a.charges) > 0 ? (
+                          a.balance != null && parseFloat(a.balance) === 0 ? (
                             <span className="font-medium text-green-600">Fully PAID</span>
-                          ) : parseFloat(a.balance || 0) > 0 ? (
+                          ) : a.balance != null && parseFloat(a.balance) > 0 ? (
                             <span className="font-medium text-red-600">
                               ₹{parseFloat(a.balance).toFixed(2)}
                             </span>
-                          ) : (
+                          ) : a.balance != null && parseFloat(a.balance) < 0 ? (
                             <span className="font-medium text-green-600">
                               ₹{parseFloat(a.balance).toFixed(2)}
                             </span>
+                          ) : (
+                            <span className="font-medium text-red-600">
+                              ₹{parseFloat(a.charges).toFixed(2)}
+                            </span>
                           )
+                        ) : a.charges != null ? (
+                          <span className="font-medium text-green-600">Fully PAID</span>
                         ) : '-'}
                       </td>
                       <td className="px-3 py-2 text-right">
