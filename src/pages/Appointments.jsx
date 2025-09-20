@@ -682,9 +682,9 @@ export default function Appointments() {
                       <td className="px-3 py-2 whitespace-nowrap">{displayType(a)}</td>
                       <td className="px-3 py-2 whitespace-nowrap"><StatusPill status={a.status} /></td>
                       <td className="px-3 py-2 max-w-[320px] truncate" title={cleanedNotes(a) || ''}>{cleanedNotes(a) || '-'}</td>
-                      <td className="px-3 py-2 text-right">{a.charges ? `₹${parseFloat(a.charges).toFixed(2)}` : '-'}</td>
-                      <td className="px-3 py-2 text-right">{a.paid ? `₹${parseFloat(a.paid).toFixed(2)}` : '-'}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2">{a.charges ? `₹${parseFloat(a.charges).toFixed(2)}` : '-'}</td>
+                      <td className="px-3 py-2">{a.paid ? `₹${parseFloat(a.paid).toFixed(2)}` : '-'}</td>
+                      <td className="px-3 py-2">
                         {a.charges && parseFloat(a.charges) > 0 ? (
                           parseFloat(a.balance || 0) === 0 ? (
                             <span className="font-medium text-green-600">Fully PAID</span>
