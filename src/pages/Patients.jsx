@@ -40,7 +40,7 @@ export default function Patients() {
     sendInvite: true,
   })
 
-  const [stats, setStats] = useState({}) // { [patientId]: { count: number, lastAt: Date|null } }
+  const [stats, setStats] = useState({}) // { [patientId]: { count: number, lastAt: Date|null, totalBalance: number } }
   const [pwInfo, setPwInfo] = useState(null) // { email, tempPassword }
 
   function fmtDate(d) {
@@ -177,11 +177,14 @@ export default function Patients() {
   }
 
   function exportCSV() {
-    const headers = ['name','email','mobile','status','last_appointment','total_appointments']
+    const headers = ['name','email','mobile','status','last_appointment','total_appointments','balance']
     const esc = (v) => '"' + String(v ?? '').replaceAll('"', '""') + '"'
     const rowsOut = (rows || []).map(r => {
       const st = stats[r.id] || {}
-      return [r.name, r.email || '', r.phone || '', r.status || '', st.lastAt ? fmtDate(st.lastAt) : '', st.count || 0]
+      const balanceText = st.totalBalance !== undefined ?
+        (st.totalBalance === 0 ? 'Fully PAID' : `₹${st.totalBalance.toFixed(2)}`) :
+        '-'
+      return [r.name, r.email || '', r.phone || '', r.status || '', st.lastAt ? fmtDate(st.lastAt) : '', st.count || 0, balanceText]
     })
     const csv = [headers.join(','), ...rowsOut.map(r => r.map(esc).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -202,15 +205,20 @@ export default function Patients() {
       if (!ids.length) { setStats({}); return }
       const { data, error } = await supabase
         .from('appointments')
-        .select('id, patient_id, start_at, appointment_date, appointment_time')
+        .select('id, patient_id, start_at, appointment_date, appointment_time, balance')
         .in('patient_id', ids)
       if (error) throw error
       const map = {}
       for (const a of (data || [])) {
         const pid = a.patient_id
         if (!pid) continue
-        const entry = map[pid] || { count: 0, lastAt: null }
+        const entry = map[pid] || { count: 0, lastAt: null, totalBalance: 0 }
         entry.count += 1
+
+        // Calculate total balance for the patient
+        const balance = parseFloat(a.balance || 0)
+        entry.totalBalance += balance
+
         let dt = null
         if (a.start_at) dt = new Date(a.start_at)
         else if (a.appointment_date) {
@@ -256,6 +264,7 @@ export default function Patients() {
               <th className="text-left px-4 py-2">Last Appt</th>
               <th className="text-left px-4 py-2">Total Appts</th>
               <th className="text-left px-4 py-2">Status</th>
+              <th className="text-left px-4 py-2">Balance</th>
               <th className="px-4 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -270,6 +279,23 @@ export default function Patients() {
                 <td className="px-4 py-2">
                   <span className={`px-2 py-0.5 rounded text-xs ${r.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700'}`}>{r.status}</span>
                 </td>
+                <td className="px-4 py-2">
+                  {stats[r.id]?.totalBalance !== undefined ? (
+                    stats[r.id].totalBalance === 0 ? (
+                      <span className="font-medium text-green-600">Fully PAID</span>
+                    ) : stats[r.id].totalBalance > 0 ? (
+                      <span className="font-medium text-red-600">
+                        ₹{stats[r.id].totalBalance.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-green-600">
+                        ₹{stats[r.id].totalBalance.toFixed(2)}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-gray-500">-</span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button onClick={()=>openEdit(r)} className="px-2 py-1 rounded border text-gray-700 hover:bg-gray-50">Edit</button>
                   <button onClick={()=>toggleActive(r)} className="px-2 py-1 rounded border text-gray-700 hover:bg-gray-50">{r.status==='active'?'Deactivate':'Activate'}</button>
@@ -277,7 +303,7 @@ export default function Patients() {
               </tr>
             ))}
             {rows.length===0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-500">{loading? 'Loading…' : 'No patients found'}</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-500">{loading? 'Loading…' : 'No patients found'}</td></tr>
             )}
           </tbody>
         </table>
