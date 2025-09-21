@@ -37,7 +37,7 @@ export default function Patients() {
     address: '',
     status: 'active',
     defaultPassword: '',
-    sendInvite: true,
+    sendInvite: false,
   })
 
   const [stats, setStats] = useState({}) // { [patientId]: { count: number, lastAt: Date|null, totalBalance: number } }
@@ -53,7 +53,7 @@ export default function Patients() {
   function resetForm() {
     setForm({
       name: '', email: '', phone: '', date_of_birth: '', gender: '', address: '', status: 'active',
-      defaultPassword: '', sendInvite: true,
+      defaultPassword: '', sendInvite: false,
     })
     setCreateLogin(true)
     setEditing(null)
@@ -382,14 +382,16 @@ export default function Patients() {
                   </label>
                   {createLogin && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="Send invite email">
+                      <Field label="Send authentication email">
                         <select value={form.sendInvite? 'yes':'no'} onChange={e=>setForm({...form, sendInvite: e.target.value==='yes'})} className="w-full border rounded px-3 py-2">
+                          <option value="no">No (Recommended)</option>
                           <option value="yes">Yes</option>
-                          <option value="no">No</option>
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">Most patients don't have email access. Select "No" to skip email verification.</p>
                       </Field>
                       <Field label="Default password (optional)">
                         <input value={form.defaultPassword} onChange={e=>setForm({...form, defaultPassword:e.target.value})} className="w-full border rounded px-3 py-2" placeholder="If empty, generates auto" />
+                        <p className="text-xs text-gray-500 mt-1">Patient can use this password to login directly without email verification.</p>
                       </Field>
                     </div>
                   )}

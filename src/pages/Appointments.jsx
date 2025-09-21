@@ -140,6 +140,7 @@ export default function Appointments() {
     appointment_type: 'checkup',
     status: 'scheduled',
     notes: '',
+    cancellation_reason: '',
     charges: '500.00',
     paid: '',
     balance: '500.00',
@@ -333,6 +334,7 @@ export default function Appointments() {
       appointment_type: (parsed.type || a.appointment_type || ''),
       status: a.status || 'scheduled',
       notes: (parsed.type ? parsed.cleaned : (a.notes || '')),
+      cancellation_reason: a.cancellation_reason || '',
       charges: a.charges || '',
       paid: a.paid || '',
       balance: a.balance || '',
@@ -394,6 +396,27 @@ export default function Appointments() {
       const s = (v ?? '').toString()
       return '"' + s.replaceAll('"', '""') + '"'
     }
+
+    // Helper function to format balance for CSV export (same logic as UI display)
+    const formatBalanceForCSV = (appointment) => {
+      const a = appointment
+      if (a.charges != null && parseFloat(a.charges) > 0) {
+        if (a.balance != null && parseFloat(a.balance) === 0) {
+          return 'Fully PAID'
+        } else if (a.balance != null && parseFloat(a.balance) > 0) {
+          return parseFloat(a.balance).toFixed(2)
+        } else if (a.balance != null && parseFloat(a.balance) < 0) {
+          return parseFloat(a.balance).toFixed(2)
+        } else {
+          return parseFloat(a.charges).toFixed(2)
+        }
+      } else if (a.charges != null) {
+        return 'Fully PAID'
+      } else {
+        return '-'
+      }
+    }
+
     const rows = appointments.map(a => [
       a.appointment_date,
       a.appointment_time,
@@ -404,7 +427,7 @@ export default function Appointments() {
       cleanedNotes(a),
       a.charges || '0.00',
       a.paid || '0.00',
-      a.balance || '0.00',
+      formatBalanceForCSV(a),
     ])
     const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -473,6 +496,9 @@ export default function Appointments() {
         updatePayload.charges = charges
         updatePayload.paid = paid
 
+        // Add cancellation reason if provided
+        updatePayload.cancellation_reason = updatePayload.cancellation_reason || null
+
         console.log('Update payload:', updatePayload) // Debug log
         const { error } = await supabase.from('appointments').update(updatePayload).eq('id', form.id)
         if (error) throw error
@@ -499,6 +525,7 @@ export default function Appointments() {
           appointment_type: payload.appointment_type || 'checkup',
           status: payload.status || 'scheduled',
           notes: payload.notes || null,
+          cancellation_reason: payload.cancellation_reason || null, // Cancellation reason
           duration_minutes: duration,                        // Set duration
           charges: charges,                                  // Payment fields
           paid: paid,
@@ -934,6 +961,20 @@ export default function Appointments() {
                 <label className="block text-xs text-gray-600 mb-1">Notes</label>
                 <textarea rows={3} value={form.notes} onChange={(e)=>setForm(f=>({...f, notes: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm" />
               </div>
+
+              {/* Cancellation Reason - only show for cancelled appointments */}
+              {form.status === 'cancelled' && (
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-600 mb-1">Cancellation Reason</label>
+                  <textarea
+                    rows={2}
+                    value={form.cancellation_reason}
+                    onChange={(e)=>setForm(f=>({...f, cancellation_reason: e.target.value}))}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    placeholder="Reason for cancellation..."
+                  />
+                </div>
+              )}
 
               {/* Payment Information Section */}
               <div className="col-span-2">
