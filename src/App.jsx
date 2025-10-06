@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
+import Home from './pages/Home'
 import Login from './pages/Login'
 import Appointments from './pages/Appointments'
 import Patients from './pages/Patients'
@@ -10,15 +11,15 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/recepadmin" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/patients" element={<Patients />} />
-            <Route path="/" element={<Navigate to="/appointments" replace />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/appointments" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
   )
