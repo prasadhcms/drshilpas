@@ -10,6 +10,11 @@ const APPOINTMENT_TYPES = [
   { value: 'extraction', label: 'Tooth Extraction' },
   { value: 'root_canal', label: 'Root Canal' },
   { value: 'crown', label: 'Crown' },
+  { value: 'inlay', label: 'Inlay' },
+  { value: 'onlay', label: 'Onlay' },
+  { value: 'implant surgery', label: 'Implant Surgery' },
+  { value: 'implant impression', label: 'Implant Impression' },
+  { value: 'cementation', label: 'Cementation' },
   { value: 'orthodontics', label: 'Orthodontics' },
   { value: 'consultation', label: 'Consultation' },
   { value: 'emergency', label: 'Emergency' },
@@ -24,7 +29,7 @@ function StatusPill({ status }) {
       completed: { bg: 'bg-green-600', text: 'text-white' },
       cancelled: { bg: 'bg-red-600', text: 'text-white' },
       'no-show': { bg: 'bg-orange-500', text: 'text-white' },
-    }
+    } 
     return map[status] || { bg: 'bg-slate-200', text: 'text-slate-800' }
   }, [status])
   return (
