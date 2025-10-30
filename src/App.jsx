@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import Appointments from './pages/Appointments'
 import Patients from './pages/Patients'
+import Doctors from './pages/Doctors'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/patients" element={<Patients />} />
+            <Route path="/doctors" element={<Doctors />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -9,6 +9,7 @@ export default function Layout() {
   const path = location.pathname || ''
   let routeTitle = ''
   if (path.startsWith('/appointments')) routeTitle = 'Appointments'
+  if (path.startsWith('/doctors')) routeTitle = 'Doctors'
 
   async function handleSignOut() {
     await signOut()
@@ -26,9 +27,10 @@ export default function Layout() {
             <span className="text-lg sm:text-xl font-semibold">Dr. Shilpa's Clinic</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 ml-6 text-sm">
+          <nav className="hidden md:flex items-center gap-4 ml-6 text-sm font-semibold">
             <NavLink to="/appointments" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Appointments</NavLink>
             <NavLink to="/patients" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Patients</NavLink>
+            <NavLink to="/doctors" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Doctors</NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-6">
