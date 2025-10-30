@@ -2,23 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 
-// Appointment types (mirrors mobile app)
-const APPOINTMENT_TYPES = [
-  { value: 'checkup', label: 'Regular Checkup' },
-  { value: 'cleaning', label: 'Teeth Cleaning' },
+// Default appointment types as fallback
+const DEFAULT_APPOINTMENT_TYPES = [
+  { value: 'checkup', label: 'Checkup' },
+  { value: 'cleaning', label: 'Cleaning' },
   { value: 'filling', label: 'Filling' },
-  { value: 'extraction', label: 'Tooth Extraction' },
+  { value: 'extraction', label: 'Extraction' },
   { value: 'root_canal', label: 'Root Canal' },
   { value: 'crown', label: 'Crown' },
-  { value: 'inlay', label: 'Inlay' },
-  { value: 'onlay', label: 'Onlay' },
-  { value: 'implant surgery', label: 'Implant Surgery' },
-  { value: 'implant impression', label: 'Implant Impression' },
-  { value: 'cementation', label: 'Cementation' },
-  { value: 'orthodontics', label: 'Orthodontics' },
-  { value: 'consultation', label: 'Consultation' },
-  { value: 'emergency', label: 'Emergency' },
-  { value: 'followup', label: 'Follow-up' },
+  { value: 'bridge', label: 'Bridge' },
+  { value: 'implant', label: 'Implant' },
+  { value: 'orthodontic', label: 'Orthodontic' },
+  { value: 'emergency', label: 'Emergency' }
 ]
 
 function StatusPill({ status }) {
@@ -78,6 +73,7 @@ export default function Appointments() {
 
   // Data for selects
   const [dentists, setDentists] = useState([])
+  const [appointmentTypes, setAppointmentTypes] = useState([])
 
   // Name cache for users (patients/dentists) by id
   const [userNameMap, setUserNameMap] = useState({})
@@ -246,6 +242,35 @@ export default function Appointments() {
     setDentists(data || [])
   }
 
+  async function loadAppointmentTypes() {
+    try {
+      const { data, error } = await supabase
+        .from('appointment_types')
+        .select('name, description, color, is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true })
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        const formattedTypes = data.map(type => ({
+          value: type.name.toLowerCase().replace(/\s+/g, '_'),
+          label: type.name,
+          color: type.color,
+          description: type.description
+        }))
+        setAppointmentTypes(formattedTypes)
+      } else {
+        // Fallback to default types
+        setAppointmentTypes(DEFAULT_APPOINTMENT_TYPES)
+      }
+    } catch (error) {
+      console.error('Error loading appointment types:', error)
+      // Fallback to default types on error
+      setAppointmentTypes(DEFAULT_APPOINTMENT_TYPES)
+    }
+  }
+
   async function load() {
     try {
       setLoading(true)
@@ -314,6 +339,7 @@ export default function Appointments() {
     setToDate(fmt(weekAhead))
     setFromDate(fmt(weekAgo))
     loadDentists()
+    loadAppointmentTypes()
   }, [])
 
   useEffect(() => {
@@ -947,7 +973,7 @@ export default function Appointments() {
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Type</label>
                 <select value={form.appointment_type} onChange={(e)=>setForm(f=>({...f, appointment_type: e.target.value}))} className="w-full border rounded px-2 py-1 text-sm">
-                  {APPOINTMENT_TYPES.map(t => (
+                  {appointmentTypes.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>

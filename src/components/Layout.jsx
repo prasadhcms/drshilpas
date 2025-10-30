@@ -10,6 +10,7 @@ export default function Layout() {
   let routeTitle = ''
   if (path.startsWith('/appointments')) routeTitle = 'Appointments'
   if (path.startsWith('/doctors')) routeTitle = 'Doctors'
+  if (path.startsWith('/appointment-types')) routeTitle = 'Appointment Types'
 
   async function handleSignOut() {
     await signOut()
@@ -27,10 +28,11 @@ export default function Layout() {
             <span className="text-lg sm:text-xl font-semibold">Dr. Shilpa's Clinic</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4 ml-6 text-sm font-semibold">
+          <nav className="topnav hidden md:flex items-center gap-4 ml-6 text-sm font-semibold">
             <NavLink to="/appointments" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Appointments</NavLink>
             <NavLink to="/patients" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Patients</NavLink>
             <NavLink to="/doctors" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Doctors</NavLink>
+            <NavLink to="/appointment-types" className={({isActive})=>`hover:underline ${isActive?'text-white':'text-white/85'}`}>Appointment Types</NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-6">

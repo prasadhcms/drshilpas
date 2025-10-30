@@ -12,3 +12,13 @@
 body {
   font-family: system-ui, -apple-system, sans-serif;
 }
+.topnav > a {
+  border: 1px solid #fff; /* Light gray border, adjust color and width as needed */
+  padding: 4px 12px;
+  border-radius: 5px; /* Rounded corners */
+  
+}
+.topnav > a:hover {
+  border: 1px solid #bedaff; /* Light gray border, adjust color and width as needed */
+  text-decoration: none;
+}
